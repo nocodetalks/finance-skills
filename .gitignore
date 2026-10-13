@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.DS_Store
+# Review work folders hold real financial data. Never commit them.
+month-end/
+# Keys (QuickBooks, Stripe). Never commit them.
+.env
+.env.*
+*.env

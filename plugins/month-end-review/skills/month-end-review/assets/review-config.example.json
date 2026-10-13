@@ -1,0 +1,45 @@
+{
+  "schema": 2,
+  "company": "Northwind SaaS",
+  "currency": "USD",
+  "ledger": "quickbooks",
+  "basis": "Accrual",
+  "fiscal_year_start_month": 1,
+  "accounts_confirmed": false,
+  "uses_stripe": true,
+  "stripe_billing_via_ar": false,
+  "uses_stripe_tax": false,
+  "uses_payroll_file": true,
+  "roles": {
+    "cash": ["Mercury Checking", "Mercury Treasury"],
+    "card": ["Brex Card"],
+    "processor_clearing": [],
+    "ar": ["Accounts Receivable (A/R)"],
+    "ap": ["Accounts Payable (A/P)"],
+    "undeposited_funds": ["Undeposited Funds"],
+    "deferred_revenue": ["Deferred Revenue"],
+    "prepaid": ["Prepaid Expenses"],
+    "accrued": ["Accrued Liabilities", "Accrued Bonus"],
+    "accrued_payroll": ["Accrued Payroll"],
+    "stripe_revenue": ["Subscription Revenue"],
+    "stripe_fees": ["Stripe Fees"],
+    "refunds": [],
+    "sales_tax_payable": [],
+    "payroll_wages": ["Payroll Expenses:Wages"],
+    "payroll_taxes": ["Payroll Expenses:Payroll Taxes"],
+    "loans": [],
+    "loan_interest": []
+  },
+  "accrual_behavior": {"Accrued Liabilities": "reversing", "Accrued Bonus": "rollforward"},
+  "bank_formats": {
+    "Mercury Checking": {"date_col": "Date", "description_col": "Description", "amount_col": "Amount", "debit_col": "", "credit_col": "", "date_format": "", "flip_sign": false, "status_col": "Status", "posted_values": ["Sent"]},
+    "Mercury Treasury": {"date_col": "Date", "description_col": "Description", "amount_col": "Amount", "debit_col": "", "credit_col": "", "date_format": "", "flip_sign": false, "status_col": "", "posted_values": []},
+    "Brex Card": {"date_col": "Date", "description_col": "Description", "amount_col": "Amount", "debit_col": "", "credit_col": "", "date_format": "", "flip_sign": true, "status_col": "", "posted_values": []}
+  },
+  "payroll_format": {"date_col": "Check date", "gross_col": "Gross earnings", "employer_tax_col": "Employer taxes", "period_start_col": "Pay period start", "period_end_col": "Pay period end", "date_format": ""},
+  "thresholds": {
+    "materiality_abs": 1000,
+    "materiality_pct": 10,
+    "materiality_abs_only": 5000
+  }
+}

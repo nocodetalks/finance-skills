@@ -1,0 +1,22 @@
+{
+  "company": "Northwind SaaS Inc",
+  "month": "2026-09",
+  "note": "Same matchers as tests/test_checks.py TestPlantedMistakes: a finding counts when its check matches and every word appears in its title (or, for T5, its detail). Findings grouped under another one ('also seen by') count.",
+  "mistakes": [
+    {"n": 1, "mistake": "Same Acme Design bill entered twice, 3 days apart", "find": [{"check": "C1", "words": ["duplicate", "Acme Design"]}]},
+    {"n": 2, "mistake": "Monthly bills missing: AWS September usage (billed Oct 3, no accrual) and Notion", "find": [{"check": "C2", "words": ["Amazon Web Services", "September"]}, {"check": "C1", "words": ["Notion", "nothing in September"]}]},
+    {"n": 3, "mistake": "Stripe payout of $11,000 that never reached the books", "find": [{"check": "T3", "words": ["11,000", "isn't in the books"]}]},
+    {"n": 4, "mistake": "Customer refund booked twice", "find": [{"check": "T4", "words": ["Refund", "2 times"]}]},
+    {"n": 5, "mistake": "Figma (software) booked to Office Supplies", "find": [{"check": "K1", "words": ["Figma", "usually Software"]}]},
+    {"n": 6, "mistake": "$12,000 HubSpot annual plan expensed in one month", "find": [{"check": "C3", "words": ["HubSpot", "prepaid"]}]},
+    {"n": 7, "mistake": "Acme Corp annual plan recognized fully in month 1", "find": [{"check": "C3", "words": ["Acme Corp", "annual plan"]}]},
+    {"n": 8, "mistake": "Stripe revenue booked at net (fees never recorded)", "find": [{"check": "T4", "words": ["1,480", "fees"]}]},
+    {"n": 9, "mistake": "August legal accrual never reversed", "find": [{"check": "C2", "words": ["Accrued Liabilities", "never reversed"]}]},
+    {"n": 10, "mistake": "Sep 30 payroll run missing from September", "find": [{"check": "T5", "detail": ["2026-09-30"]}]},
+    {"n": 11, "mistake": "Manual journal entry to receivables ($3,000 revenue true-up)", "find": [{"check": "T2", "words": ["receivable", "3,000"]}], "live_note": "QuickBooks requires a customer on a journal entry to A/R, which puts it in the aging, so the aging ties; T2 flags the entry itself since 2026-10-12 (it was missed in the first live run)."},
+    {"n": 12, "mistake": "Transposed deposit ($1,530 booked as $1,350) and a $50,000 treasury move booked on one side only", "find": [{"check": "T1", "words": ["1,350", "1,530", "digits swapped"]}, {"check": "T1", "words": ["Treasury", "not in the books", "50,000"]}]},
+    {"n": 13, "mistake": "Cooley bill dated Sep 28 but entered after month-end", "find": [{"check": "C2", "words": ["Cooley", "after month-end"]}], "live_note": "QuickBooks stamps each bill with the day it was created, which can't be backdated, so every September bill in the sandbox looks entered late. Caught, but not distinguishable from those."},
+    {"n": 14, "mistake": "Prepaid insurance not amortized this month", "find": [{"check": "C3", "words": ["Prepaid Expenses", "amortized"]}]},
+    {"n": 15, "mistake": "Founder's personal dinner (Nobu) on the company card, coded to Meals", "expect": "missed", "find": [{"words": ["nobu"]}], "live_note": "Needs a person's judgment; the honest miss."}
+  ]
+}

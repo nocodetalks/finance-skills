@@ -1,0 +1,21 @@
+{
+  "name": "finance-skills",
+  "owner": {
+    "name": "nocodetalks",
+    "url": "https://github.com/nocodetalks"
+  },
+  "metadata": {
+    "description": "Free, read-only Claude Code skills for startup finance teams on QuickBooks Online and Stripe. Every number traces to its source rows; every skill stops when an input is missing.",
+    "version": "0.1.0"
+  },
+  "plugins": [
+    {
+      "name": "month-end-review",
+      "source": "./plugins/month-end-review",
+      "description": "Checks a closed month is right (cash, card, AR/AP, Stripe and payroll tie-outs; missing, duplicate and late bills; accruals, prepaids, deferred revenue; wrong accounts), then writes variance commentary and an investor-update draft with every number traced to source rows. Read-only.",
+      "version": "0.1.0",
+      "category": "finance",
+      "keywords": ["finance", "accounting", "month-end", "close", "quickbooks", "stripe", "variance", "reconciliation"]
+    }
+  ]
+}

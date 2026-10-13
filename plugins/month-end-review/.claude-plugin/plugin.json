@@ -1,0 +1,13 @@
+{
+  "name": "month-end-review",
+  "version": "0.1.0",
+  "description": "Read-only month-end review for startups on QuickBooks Online + Stripe: tie-outs, cutoff, accruals, prepaids, deferred revenue and wrong-account checks, then variance commentary and an investor-update draft with every number traced to source rows. Stops when a required input is missing.",
+  "author": {
+    "name": "nocodetalks",
+    "url": "https://github.com/nocodetalks"
+  },
+  "homepage": "https://github.com/nocodetalks/finance-skills/tree/main/plugins/month-end-review",
+  "repository": "https://github.com/nocodetalks/finance-skills",
+  "license": "MIT",
+  "keywords": ["finance", "accounting", "month-end", "close", "quickbooks", "stripe", "variance", "reconciliation"]
+}
