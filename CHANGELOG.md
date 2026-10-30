@@ -1,5 +1,43 @@
 # Changelog
 
+## Unreleased
+
+Three checks from a real report of AI bookkeeping failures: transfers booked as income, one vendor under two
+names, and payroll not split between cost of sales and admin.
+
+- **K4: transfers between your own accounts booked as income.**
+  - K3 only flags credits of $25,000 or more from new payers, so a $5,000 transfer from savings coded to revenue
+    got through.
+  - K4 flags a deposit or credit to revenue or other income when the same amount leaves another of your bank
+    accounts within 3 days. That's a book line that isn't an ordinary payment, or a statement row that isn't in
+    the books.
+  - It also flags one whose payee, memo or bank description reads like a transfer, or is the company's own name.
+  - Invoices, credit memos, and Stripe or other processor activity are left to T3 and T4.
+  - The mirror case, a transfer or card payment booked to an expense, is flagged on the same evidence. Northwind's
+    one-sided $50,000 treasury move is now led by K4, with K1 and T1 under it.
+  - New thresholds: `transfer_window_days` (3) and `transfer_min_amount` ($100).
+- **C5: the same vendor under two names, and C1 matches names the same way.**
+  - `vendor_key` drops card-processor prefixes, store numbers, punctuation, a leading "The" and company suffixes.
+  - C1 now finds duplicates across "Home Depot" and "THE HOME DEPOT #4521", and no longer reports a vendor renamed
+    to "Notion, Inc." as a missing bill.
+  - C5 flags vendor records whose names match once normalized, or are near-identical. Near-identical means letters
+    added or dropped, at least 90% alike, the same digits, and the same expense account.
+  - It's low or medium severity, and the fix is to merge the records in QuickBooks.
+  - New thresholds: `vendor_similarity_pct` (90) and `vendor_match_min_length` (8).
+- **K5: payroll split between cost of sales and operating expenses.**
+  - It compares the month's cost-of-sales share of payroll with `payroll_cogs_pct`, or else with the last 6
+    months. `payroll_cogs_pct` is a new review-config.json key: a share from 0 to 100 that a person fills in and
+    confirms with `confirm-roles`.
+  - It flags all payroll in operating expenses when part belongs in cost of sales, or a share more than 10 points
+    off (`payroll_split_slack_pct`).
+  - It's NOT RUN when there's neither an answer nor cost-of-sales payroll in the history, and says what to add.
+  - Payroll stays a total.
+- **Tests:** 227 (25 new). They include look-alikes that must not be flagged:
+  - a customer's wire
+  - a customer deposit and an unrelated check for the same amount on the same day
+  - a correctly booked transfer next to a deposit of the same amount
+  - Smith / Smyth Plumbing, Building 1 / Building 2 LLC, and Pacific Gas / Pacific Glass on different accounts
+
 ## month-end-review 0.1.0 (unreleased)
 
 First version, reworked after two independent reviews (2026-10-11) and a re-review of the fixes (2026-10-12).
@@ -75,7 +113,14 @@ First version, reworked after two independent reviews (2026-10-11) and a re-revi
     - MRR computed
     - annual-plan detection run
     - the same 14 of 14 score
-- **Tests:** 199, on the synthetic Northwind fixture and faked APIs. These have also run against an Intuit sandbox
+- **Security fixes (2026-10-13):**
+  - **CSV formula injection.** Text cells from QuickBooks, Stripe or a bank that start with `=`, `+`, `-` or `@` are
+    written with a leading `'`. Excel and Sheets then show them as text instead of running them; plain numbers are
+    unchanged. `read_csv` removes the `'` again, so carried-forward files round-trip.
+  - **Integrity check.** `verify` no longer trusts a hash file stored next to the outputs, which could be rewritten
+    along with them. It rebuilds `results.json`, every field and not just the numbers, and both documents from the
+    inputs, then compares. `.integrity.json` is gone.
+- **Tests:** 202, on the synthetic Northwind fixture and faked APIs. These have also run against an Intuit sandbox
   company:
   - the QuickBooks pull, gate and review
   - the `connect` sign-in, then a pull

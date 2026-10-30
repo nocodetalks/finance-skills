@@ -194,10 +194,20 @@ def overlap_days(a0: date, a1: date, b0: date, b1: date) -> int:
 
 # ---------- I/O ----------
 
+# A cell starting with one of these runs as a formula in Excel or Google Sheets. Text cells from QuickBooks, Stripe
+# or a bank (memos, names, descriptions) are written with a leading ' so they show as text; read_csv removes it.
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+_PLAIN_NUMBER = re.compile(r"[-+]?(\d[\d,]*)?\.?\d+%?")
+
+
+def _unescape(v):
+    return v[1:] if isinstance(v, str) and len(v) > 1 and v[0] == "'" and v[1] in _FORMULA_START else v
+
+
 def read_csv(path: Path) -> list[dict]:
     try:
         with open(path, newline="", encoding="utf-8-sig") as f:
-            return list(csv.DictReader(f))
+            return [{k: _unescape(v) for k, v in r.items()} for r in csv.DictReader(f)]
     except UnicodeDecodeError as e:
         raise StopRun(f"{path.name} is not a UTF-8 CSV file.") from e
 
@@ -225,7 +235,9 @@ def _cell(v):
     if isinstance(v, date):
         return v.isoformat()
     if isinstance(v, (list, tuple, set)):
-        return "; ".join(str(x) for x in v)
+        v = "; ".join(str(x) for x in v)
+    if isinstance(v, str) and v.startswith(_FORMULA_START) and not _PLAIN_NUMBER.fullmatch(v):
+        return "'" + v
     return "" if v is None else v
 
 
@@ -266,6 +278,32 @@ def slug(s: str) -> str:
 def norm(s: str) -> str:
     """Normalise a name for matching (vendor names, account names)."""
     return re.sub(r"\s+", " ", (s or "").strip().lower())
+
+
+# Card-processor prefixes that bank feeds put on vendor names: "SQ *BLUE BOTTLE", "TST* JOE'S", "PAYPAL *ADOBE".
+_PROCESSOR_PREFIX = re.compile(r"^(sq|tst|paypal|pp|sp|in|py|dd|fs|ckc|wpy|sumup|zettle|izettle|paddle\.net|2co)\s*\*\s*")
+_STORE_NO = re.compile(r"\s+((store|unit|loc|location|no\.?)\s*#?\s*\d+|#\s*\d+)\b.*$")   # "#4521 Atlanta GA", "Store 12"
+_SUFFIXES = {"inc", "incorporated", "llc", "pllc", "llp", "lp", "ltd", "limited", "corp", "corporation", "co", "company",
+             "plc", "pc"}
+
+
+def vendor_key(s: str) -> str:
+    """A vendor name reduced so variants of one name match: 'The Home Depot #4521' and 'Home Depot, Inc.' -> 'homedepot'.
+
+    Drops a card-processor prefix (SQ *, TST*, PAYPAL * ...), a store or location number and anything after it,
+    trailing numbers of 3+ digits, a web domain (.com), '&' and 'and', punctuation, a leading 'the', company suffixes
+    (Inc, LLC, Corp, Co, Ltd ...) and spaces. Short numbers inside a name stay, so 'Building 1' isn't 'Building 2',
+    and neither do leading ones ('7-Eleven', '24 Hour Fitness')."""
+    t = _PROCESSOR_PREFIX.sub("", (s or "").strip().lower())
+    t = _STORE_NO.sub("", t)
+    t = re.sub(r"\.(com|net|org|io|co|ai|app)\b", " ", t)
+    t = re.sub(r"['’.]", "", t.replace("&", " "))
+    words = [w for w in re.sub(r"[^a-z0-9]+", " ", t).split() if w != "and"]
+    if len(words) > 1 and words[0] == "the":
+        words = words[1:]
+    while len(words) > 1 and (words[-1] in _SUFFIXES or re.fullmatch(r"\d{3,}", words[-1])):
+        words = words[:-1]
+    return "".join(words) or re.sub(r"\s+", "", norm(s))
 
 
 def memo_key(s: str) -> str:

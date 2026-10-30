@@ -3,12 +3,13 @@ name: month-end-review
 description: >-
   Reviews a closed month for a US startup on QuickBooks Online, Stripe and US banks before the numbers go to
   investors. It checks the month is right first: cash, card, AR/AP, Stripe and payroll tie-outs; duplicate,
-  missing and late bills; accruals, prepaids, deferred revenue and annual plans; missing monthly entries;
-  wrong accounts and financing booked as revenue; and every balance-sheet account. Then it computes cash, burn,
-  runway and MRR, and writes variance commentary and an investor-update draft in which every number traces to
-  source rows and is machine-checked. Read-only, and it stops cold when a required input is missing. Use when
-  someone asks to review, check or sanity-check a month-end close, or to write the month's variance commentary
-  or investor update from QuickBooks.
+  missing and late bills; accruals, prepaids, deferred revenue and annual plans; missing monthly entries; wrong
+  accounts; transfers and financing booked as revenue; one vendor under two names; the payroll split between cost
+  of sales and opex; and every balance-sheet account. Then it computes cash, burn, runway and MRR, and writes
+  variance commentary and an investor-update draft in which every number traces to source rows and is
+  machine-checked. Read-only, and it stops cold when a required input is missing. Use when someone asks to
+  review, check or sanity-check a month-end close, or to write the month's variance commentary or investor update
+  from QuickBooks.
 license: MIT
 compatibility: Python 3.10+ (standard library only). QuickBooks Online via the person's own Intuit app keys (read-only in code); Stripe via a restricted read-only key or CSV export; bank and card statements as CSV.
 metadata:
@@ -40,7 +41,11 @@ to the person, and write the commentary, owner questions and investor notes from
    in this conversation, that the roles are right, that a source truly had no activity, or why an item is
    acknowledged. Pass their name in `--by`.
 7. **Say what wasn't checked.** The coverage list stays in every review. Never describe the month as "clean".
-8. **Keys never enter the chat.**
+8. **The checks decide what's unusual, not you.** Exceptions come only from the scripts. Never drop, merge, soften
+   or explain away one, and never add your own. If you think something is wrong or missing, raise it as a question
+   for the person. Only a person clears an item (`acknowledge`, rule 6) or posts a draft entry (rule 5), so the one
+   who checks is never the one who did the work.
+9. **Keys never enter the chat.**
    - Never open, read, print, search or copy `.env` or anything in `~/.config/finance-skills/`. Only the scripts
      read them.
    - Never ask for a Client ID, secret or API key in chat.
@@ -91,8 +96,11 @@ Then run `mer.py pull-qbo --month 2026-09`.
    - `processor_clearing` for a Stripe clearing account
    - `accrual_behavior` for accruals that build up (bonus, audit)
    - `bank_formats` for each CSV's columns, and `status_col` for exports that include pending rows
-3. When they agree, run `mer.py confirm-roles --by "<their name>"`. Any later change to the roles needs confirming
-   again.
+   - `payroll_cogs_pct`, if part of payroll (field, delivery or support staff) belongs in cost of sales: the share
+     from 0 to 100, or 0 if none does. It's the person's answer, typed by them, never yours; leave it `null` if
+     they don't know. Those wage accounts go in `payroll_wages`
+3. When they agree, run `mer.py confirm-roles --by "<their name>"`. Any later change to the roles (or to
+   `payroll_cogs_pct`) needs confirming again.
 
 See [references/inputs.md](references/inputs.md).
 
@@ -154,8 +162,8 @@ Details and limits: [references/checks.md](references/checks.md).
 |---|---|
 | Gate | **G1** everything required is here · **G2** right dates, in content and labels · **G3** right shape · **G4** everything adds up (trial balance, each transaction, history vs P&L report, each statement, Stripe) · **G5** empty counts as missing |
 | Tie-outs | **T1** cash and cards vs statements (carrying uncleared items forward) · **T2** AR/AP aging, unapplied payments, AR over 90 days, Undeposited Funds · **T3** Stripe payouts reach the bank and the books; clearing account vs the Stripe balance · **T4** Stripe fees, refunds, sales and tax vs the books · **T5** payroll vs provider, accruals included |
-| Completeness | **C1** duplicates, and bills also paid as expenses; missing recurring bills · **C2** cutoff and accrual reversals · **C3** prepaids, deferred revenue, annual plans (including those billed in Stripe) · **C4** missing monthly journal entries, loan interest |
-| Classification | **K1** wrong account, suspense, impossible signs · **K2** accounts against their own history · **K3** large inflows from new payers booked as revenue |
+| Completeness | **C1** duplicates, and bills also paid as expenses; missing recurring bills · **C2** cutoff and accrual reversals · **C3** prepaids, deferred revenue, annual plans (including those billed in Stripe) · **C4** missing monthly journal entries, loan interest · **C5** the same vendor under two names |
+| Classification | **K1** wrong account, suspense, impossible signs · **K2** accounts against their own history · **K3** large inflows from new payers booked as revenue · **K4** transfers between your own accounts booked as income (or as an expense) · **K5** payroll split between cost of sales and operating expenses, vs `payroll_cogs_pct` or history |
 | Variance | **V1** P&L month, budget and year to date · **V2** every balance-sheet account, and what nothing reconciles · **V3** cash, burn, runway, revenue, margin, MRR · **V4** your commentary, then `verify` |
 
 After the checks:

@@ -36,8 +36,8 @@ For each month, a folder with:
 |---|---|
 | Gate | Everything required is here, for the right dates, in the right shape, adds up (trial balance, every transaction, history vs P&L, statements, Stripe), and isn't empty. Otherwise **stop** |
 | Tie-outs | Cash and cards vs statements · AR/AP aging and receivables hygiene · Stripe payouts and the clearing account · Stripe fees, refunds, sales and tax vs books · payroll, accruals included |
-| Completeness | Duplicates, and bills paid twice · missing recurring bills · cutoff and accruals · prepaids, deferred revenue, annual plans · missing monthly entries, loan interest |
-| Classification | Wrong account, suspense, impossible signs · unusual vs history · financing booked as revenue |
+| Completeness | Duplicates, and bills paid twice · missing recurring bills · cutoff and accruals · prepaids, deferred revenue, annual plans · missing monthly entries, loan interest · one vendor under two names |
+| Classification | Wrong account, suspense, impossible signs · unusual vs history · financing booked as revenue · transfers between your own accounts booked as income · payroll split between cost of sales and opex |
 | Variance | P&L flux · balance-sheet flux · cash, burn, runway, MRR · commentary, verified |
 
 Details: [references/checks.md](skills/month-end-review/references/checks.md).
@@ -65,3 +65,5 @@ Full list: [references/inputs.md](skills/month-end-review/references/inputs.md).
   - matching Stripe charge by charge (that's `stripe-to-books`)
 - **Judging whether a card charge was personal.** That stays with a person, and the review says so.
 - **Posting anything.** It never posts.
+- **Deciding what's fine.** The scripts find the exceptions, and Claude can't drop or soften one. Clearing an item
+  or posting an entry is always a person's call, so whoever checks the month isn't the one who did the work.

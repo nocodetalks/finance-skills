@@ -9,7 +9,8 @@ from ..config import threshold
 from ..data import Data
 from .base import SEV_ORDER
 
-PRIORITY = ["T3", "T5", "T4", "C2", "C1", "C3", "C4", "K3", "T2", "K1", "V2", "T1", "K2"]
+# Which check leads a group: the most specific cause first (a K4 transfer explains its K3, K1 and T1 items).
+PRIORITY = ["T3", "T5", "T4", "C2", "C1", "C3", "C4", "K4", "K3", "T2", "K1", "K5", "V2", "T1", "K2", "C5"]
 LEVELS = ["high", "medium", "low"]
 
 

@@ -58,7 +58,7 @@ command, type `/month-end-review:month-end-review` (Claude Code's form for a plu
 python3 -m unittest discover -s tests -v
 ```
 
-There are 199 tests on a small synthetic company ("Northwind", September 2026). They cover:
+There are 227 tests on a small synthetic company ("Northwind", September 2026). They cover:
 - **The 15 planted mistakes:** 14 caught, plus the one we expect to miss (a personal dinner on the company card
   needs a person's judgment).
 - **Realistic scenarios:**
@@ -71,6 +71,8 @@ There are 199 tests on a small synthetic company ("Northwind", September 2026). 
   - accruals that build up month to month
   - missing depreciation
   - cards that close mid-month
+  - transfers between your own accounts booked as income, one vendor under two names, and payroll in the
+    wrong part of the P&L
 - **Every way the gate must stop.**
 - **Every known way to fool the number check.**
 - **Re-runs, crashes and acknowledgements.**

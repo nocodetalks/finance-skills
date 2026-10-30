@@ -104,6 +104,10 @@ Without pay-period dates, it compares check-date totals plus the change in accru
   - A bill dated by month-end, still open in AP, and paid afterwards as an expense or check (within 60 days).
   - Missing recurring bills: a payee billed in 4 of the last 6 months, with nothing this month and no
     next-month bill naming this month.
+  - Payees are compared by their normalized name (see C5), so "Home Depot" and "THE HOME DEPOT #4521" are one
+    payee for duplicates, and a vendor renamed from "Notion" to "Notion, Inc." isn't reported missing. A rename
+    that adds or drops letters is still reported missing, but the item names the near-identical name used this
+    month.
   - Payroll, Stripe fees and clearing-account transactions are left to their own checks.
 - **C2:**
   - Bills dated in the month but entered after it.
@@ -123,6 +127,31 @@ Without pay-period dates, it compares check-date totals plus the change in accru
     depreciation, amortization or stock comp. It's reported once per entry. A same-account entry within 10% of
     the usual amount counts as booked, even if the memo changed.
   - Loans outstanding with no interest booked.
+- **C5: the same vendor under two names.** It compares the payee names on expense lines, this month and the last 6
+  months (payroll, Stripe fees and clearing-account lines are left out). It flags vendor records, at least one of
+  them used this month, when:
+  - **the names match once normalized.** It drops a card-processor prefix (`SQ *`, `TST*`, `PAYPAL *`…), a store
+    or location number and anything after it (`#4521 ATLANTA GA`, `Store 12`), trailing numbers of 3+ digits, a
+    web domain (`.com`), `&` and "and", punctuation, a leading "The", company suffixes (Inc, LLC, LLP, Corp, Co,
+    Ltd…) and spaces. Or
+  - **the names are near-identical:** one is the other with up to 3 letters added or dropped, at least 90% alike
+    (`vendor_similarity_pct`), both at least 8 characters once normalized (`vendor_match_min_length`), with the same
+    digits, *and* both used for at least one same expense account.
+
+  Severity starts at low, and the amount is what's booked under the less-used name(s), so it reaches medium at
+  $5,000. The fix is to merge the records in QuickBooks. The item doesn't mark P&L lines as unreliable.
+
+  Limits:
+  - On purpose, it doesn't match these, which are usually different businesses:
+    - a swapped letter (Smith / Smyth Plumbing)
+    - a different number (Building 1 / Building 2 LLC)
+    - near-identical names on different accounts (Pacific Gas / Pacific Glass)
+    - short names that differ at all (Stripe / Stripes)
+  - It misses renames that add a word (Notion / Notion Labs), abbreviations (AMZN Mktp / Amazon) and typos that
+    swap letters.
+  - Two businesses can share a normalized name (Delta Inc / Delta LLC, or Cafe 101 / Cafe 202, since trailing
+    numbers of 3+ digits are dropped). Acknowledge those.
+  - Customers and employees aren't compared.
 
 ## Classification
 
@@ -135,6 +164,63 @@ Without pay-period dates, it compares check-date totals plus the change in accru
 - **K3:** possible financing (a SAFE, equity or a loan) booked as revenue. It flags credits ≥ $25,000 to revenue
   (not invoices) from a payer with no revenue history (an unnamed payer counts as new), or more than twice
   anything that account has received before.
+- **K4: transfers between your own accounts booked as income.** Money moving between the accounts in `roles.cash`
+  and `roles.card`, but booked this month to an income account (revenue or other income). A deposit or credit to
+  income is flagged when either:
+  - **the money matches.** The same amount leaves another of your bank accounts (`roles.cash`) within 3 days
+    (`transfer_window_days`), as one of:
+    - a book line that isn't an ordinary payment (a named payee whose other side is income, an expense, AR or AP)
+    - a statement row that isn't in the books
+    - a transfer that's already booked, but only when it lands in the same account and the bank shows the money
+      once (the transfer, plus a copy of it booked as revenue)
+  - **the words say so.** The payee, memo or bank description says transfer, xfer or trf, or "from" or "to"
+    savings, checking, treasury, money market or reserve. Or it *is* the company's own name, normalized like a
+    vendor name. On a card account, "payment received", "payment - thank you" and "autopay" count too.
+
+  It skips amounts under $100 (`transfer_min_amount`), invoices and credit memos, anything touching
+  `processor_clearing`, and anything naming Stripe or another payment processor (T3 and T4 cover those).
+
+  **The mirror case:** money leaving a bank account but booked to an expense is flagged on the same evidence: the
+  same amount arriving in another bank or card account (a card payment), or the same words, plus "credit card
+  payment" or "card payment". Payroll and Stripe-fee lines are left out. One transfer booked wrong on both sides is
+  one item.
+
+  Severity starts at medium and follows the amount. The item leads the T1, K1 or K3 items about the same money. When
+  the other account's side is known, a *confirm first* draft moves the amount to it.
+
+  Limits:
+  - "Wire transfer", "Zelle transfer" and "transfer fee", "agent", "pricing" or "tax" don't count as transfer
+    words, so a customer's wire isn't flagged on its wording. A transfer described only as a wire is found only if
+    the money matches.
+  - The company's name must be the whole payee or memo, not part of it, since customers write it on payments.
+  - Money from an account that isn't in the review (another bank, a personal account) is found only by its
+    wording.
+  - The other side is missed if it's booked as an ordinary payment to a named payee.
+  - With one bank account, deposits into it are judged by their wording only, and the review says so. With one
+    bank or card account in all, the matching part is NOT RUN.
+- **K5: payroll split between cost of sales and operating expenses.** Payroll means the payroll expense accounts:
+  roles `payroll_wages` and `payroll_taxes`, plus any account with a payroll subtype. Its cost-of-sales part is
+  those of type Cost of Goods Sold. This month's cost-of-sales share of payroll is compared with:
+  - **`payroll_cogs_pct` in review-config.json:** the share (0 to 100) a person says belongs in cost of sales. The
+    check flags a share more than 10 percentage points away (`payroll_split_slack_pct`).
+  - **Without it, the last 6 months** (at least 3 with payroll). The check flags a share more than 10 points
+    outside their range.
+
+  Either way, all of the month's payroll in operating expenses is flagged, however small the expected share, when
+  `payroll_cogs_pct` or every past month says part belongs in cost of sales. The amount is the payroll that would
+  have to move to reach the expected share (or the edge of the range). Under $1,000 (`range_floor`) isn't flagged.
+  Severity starts at medium.
+
+  It's NOT RUN when no payroll was booked to a cost-of-sales account in the last 6 months and `payroll_cogs_pct`
+  isn't set. The reason says what to add. `payroll_cogs_pct` is a person's answer and part of what `confirm-roles`
+  records, so changing it needs confirming again. Payroll shows as totals only, and the draft is *needs your
+  amount*.
+
+  Limits:
+  - It sees the total split, not which people belong where.
+  - A cost-of-sales wage account must be in `roles.payroll_wages` (or have a payroll subtype) to count.
+  - Contractors paid outside payroll, on an expense account such as Contractors, aren't payroll here. Adding that
+    account to `roles.payroll_wages` would break T5's tie to the payroll provider.
 
 ## Variance and metrics
 
@@ -166,6 +252,7 @@ Without pay-period dates, it compares check-date totals plus the change in accru
 - **One cause is reported once.**
   - Items merge only when they share a transaction, the same account + date + amount, or an explicit link (for
     example, an unbooked payout and the clearing-account gap).
+  - The most specific check leads the item. A K4 transfer leads the T1, K1 and K3 items about the same money.
   - A bank line that isn't in the books then attaches to *one* other item with the same date + amount, if there
     is exactly one. Nothing chains further.
 - **Acknowledged items** (`mer.py acknowledge`, saved in `acknowledged.json`) are listed separately and don't count

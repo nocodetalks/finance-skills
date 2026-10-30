@@ -10,6 +10,7 @@
   "stripe_billing_via_ar": false,
   "uses_stripe_tax": false,
   "uses_payroll_file": true,
+  "payroll_cogs_pct": null,
   "roles": {
     "cash": ["Mercury Checking", "Mercury Treasury"],
     "card": ["Brex Card"],
@@ -40,6 +41,11 @@
   "thresholds": {
     "materiality_abs": 1000,
     "materiality_pct": 10,
-    "materiality_abs_only": 5000
+    "materiality_abs_only": 5000,
+    "transfer_window_days": 3,
+    "transfer_min_amount": 100,
+    "vendor_similarity_pct": 90,
+    "vendor_match_min_length": 8,
+    "payroll_split_slack_pct": 10
   }
 }

@@ -58,6 +58,11 @@ DEFAULT_THRESHOLDS = {
     "drift_min_history_lines": 3,
     "deferral_min_period_days": 45,
     "ack_months": 3,
+    "transfer_window_days": 3,
+    "transfer_min_amount": "100",
+    "vendor_similarity_pct": "90",
+    "vendor_match_min_length": 8,
+    "payroll_split_slack_pct": "10",
 }
 INT_KEYS = {k for k, v in DEFAULT_THRESHOLDS.items() if isinstance(v, int)}
 
@@ -118,6 +123,19 @@ def load(root: Path) -> dict:
         if v not in ("reversing", "rollforward"):
             raise StopRun(f'accrual_behavior["{k}"] must be "reversing" or "rollforward".')
     cfg["accrual_behavior"] = beh
+    # A person's answer, not a threshold: the share of payroll (0 to 100) that belongs in cost of sales. null = no answer.
+    pc = cfg.get("payroll_cogs_pct")
+    if pc is not None:
+        try:
+            if isinstance(pc, bool) or not isinstance(pc, (int, float, str)):
+                raise ValueError
+            pc = Decimal(str(pc).strip())
+            if not pc.is_finite() or not 0 <= pc <= 100:
+                raise ValueError
+        except (ValueError, InvalidOperation):
+            raise StopRun('"payroll_cogs_pct" in review-config.json must be a number from 0 to 100 (the share of payroll '
+                          f'that belongs in cost of sales), or null, got {cfg["payroll_cogs_pct"]!r}.')
+        cfg["payroll_cogs_pct"] = pc
     return cfg
 
 
@@ -126,8 +144,10 @@ def threshold(cfg: dict, key: str):
 
 
 def _roles_sha(cfg: dict) -> str:
-    blob = json.dumps({"roles": cfg.get("roles"), "accrual_behavior": cfg.get("accrual_behavior") or {}},
-                      sort_keys=True)
+    what = {"roles": cfg.get("roles"), "accrual_behavior": cfg.get("accrual_behavior") or {}}
+    if cfg.get("payroll_cogs_pct") is not None:      # only when set, so configs without it keep their confirmation
+        what["payroll_cogs_pct"] = str(cfg["payroll_cogs_pct"]).strip()
+    blob = json.dumps(what, sort_keys=True)
     return hashlib.sha256(blob.encode()).hexdigest()[:16]
 
 
@@ -137,8 +157,8 @@ def confirmed(cfg: dict) -> str:
     if not (isinstance(c, dict) and str(c.get("by", "")).strip()):
         return "The account roles in review-config.json have not been confirmed by a person."
     if c.get("roles_sha") != _roles_sha(cfg):
-        return (f"The account roles changed after {c['by']} confirmed them on {c.get('at', '?')[:10]}. "
-                "They need confirming again.")
+        return (f"The account roles (or payroll_cogs_pct) changed after {c['by']} confirmed them on "
+                f"{c.get('at', '?')[:10]}. They need confirming again.")
     return ""
 
 
@@ -210,6 +230,7 @@ def propose(accounts: list[dict], company: str, prefs: dict) -> dict:
         "stripe_billing_via_ar": False,
         "uses_stripe_tax": bool(roles["sales_tax_payable"]),
         "uses_payroll_file": False,
+        "payroll_cogs_pct": None,
         "roles": roles,
         "accrual_behavior": accrued,
         "bank_formats": {

@@ -70,6 +70,12 @@ class Book:
     def __init__(self):
         self.lines = []
         self.n = 0
+        self.names, self.cls, self.extra = dict(NAMES), dict(CLS), []
+
+    def account(self, aid, full_name, atype, subtype, classification):
+        """Add an account for one scenario only; the base chart (also loaded into the sandbox) stays as it is."""
+        self.extra.append((aid, full_name, atype, subtype, classification))
+        self.names[aid], self.cls[aid] = full_name, classification
 
     def txn(self, ttype, dt, name, memo, entries, doc=""):
         assert sum(D(str(a)) for _, a in entries) == 0, (ttype, dt, name, entries)
@@ -79,7 +85,7 @@ class Book:
         for aid, amt in entries:
             seq[aid] = seq.get(aid, 0) + 1
             self.lines.append({"line_id": f"{tid}-{aid}-{seq[aid]}", "txn_id": tid, "txn_type": ttype, "date": dt,
-                               "account_id": aid, "account": NAMES[aid], "name": name, "memo": memo,
+                               "account_id": aid, "account": self.names[aid], "name": name, "memo": memo,
                                "doc_num": doc, "amount": D(str(amt))})
         return tid
 
@@ -198,8 +204,8 @@ def base_extras():
     }
 
 
-def natural(aid, amt):
-    return -amt if CLS[aid] == "Revenue" else amt
+def natural(aid, amt, cls=CLS):
+    return -amt if cls[aid] == "Revenue" else amt
 
 
 def build(root: Path, with_budget: bool = True, scenario=None) -> Path:
@@ -218,7 +224,7 @@ def build(root: Path, with_budget: bool = True, scenario=None) -> Path:
     month_dir = root / PERIOD
     inp = month_dir / "inputs"
     accounts = [{"account_id": a, "name": n.split(":")[-1], "full_name": n, "account_type": t, "account_subtype": st,
-                 "classification": c, "active": "true"} for a, n, t, st, c in ACCOUNTS]
+                 "classification": c, "active": "true"} for a, n, t, st, c in ACCOUNTS + b.extra]
     write_csv(inp / "accounts.csv", accounts, ["account_id", "name", "full_name", "account_type", "account_subtype",
                                                 "classification", "active"])
 
@@ -226,7 +232,7 @@ def build(root: Path, with_budget: bool = True, scenario=None) -> Path:
         bal = {}
         for l in lines:
             bal[l["account_id"]] = bal.get(l["account_id"], D(0)) + l["amount"]
-        return [{"account_id": a, "account": NAMES[a], "debit": v if v > 0 else D(0), "credit": -v if v < 0 else D(0)}
+        return [{"account_id": a, "account": b.names[a], "debit": v if v > 0 else D(0), "credit": -v if v < 0 else D(0)}
                 for a, v in sorted(bal.items(), key=lambda kv: int(kv[0])) if v != 0]
 
     gl_fields = ["line_id", "txn_id", "txn_type", "date", "account_id", "account", "name", "memo", "doc_num", "amount"]
@@ -237,15 +243,15 @@ def build(root: Path, with_budget: bool = True, scenario=None) -> Path:
 
     pm = defaultdict(lambda: D(0))
     for l in history_lines + sep_lines:
-        if CLS[l["account_id"]] in ("Revenue", "Expense"):
-            pm[(l["account_id"], l["date"].strftime("%Y-%m"))] += natural(l["account_id"], l["amount"])
-    write_csv(inp / "pnl_monthly.csv", [{"account_id": a, "account": NAMES[a], "month": m, "amount": v}
+        if b.cls[l["account_id"]] in ("Revenue", "Expense"):
+            pm[(l["account_id"], l["date"].strftime("%Y-%m"))] += natural(l["account_id"], l["amount"], b.cls)
+    write_csv(inp / "pnl_monthly.csv", [{"account_id": a, "account": b.names[a], "month": m, "amount": v}
                                         for (a, m), v in sorted(pm.items()) if v != 0], ["account_id", "account", "month", "amount"])
     ytd = defaultdict(lambda: D(0))
     for (a, m), v in pm.items():
         if m >= "2026-01":
             ytd[a] += v
-    write_csv(inp / "pnl_ytd.csv", [{"account_id": a, "account": NAMES[a], "amount": v} for a, v in sorted(ytd.items())],
+    write_csv(inp / "pnl_ytd.csv", [{"account_id": a, "account": b.names[a], "amount": v} for a, v in sorted(ytd.items())],
               ["account_id", "account", "amount"])
 
     allx = history_lines + sep_lines

@@ -53,7 +53,8 @@ class TestStatementIngest(IngestBase):
         src = self.root / "brex.csv"
         write(src, ["Date", "Desc", "Amount"], [["2026-09-06", "FIGMA", "480.00"], ["2026-09-28", "PAYMENT", "-1080.00"]])
         inputs.ingest_statement(self.month, P, cfg, "Brex Card", src, "0", "2026-09-30", "600", None, self.man)
-        rows = list(csv.DictReader(open(self.inp / "bank" / "3.csv")))
+        with open(self.inp / "bank" / "3.csv") as f:
+            rows = list(csv.DictReader(f))
         self.assertEqual([r["amount"] for r in rows], ["-480.00", "1080.00"])
 
     def test_status_column_must_be_configured(self):
@@ -127,7 +128,8 @@ class TestStripeCsv(IngestBase):
         write(b, self.HDR, [["t1", "2026-09-02", "charge", "10.00", "1.00", "9.00", "usd"],
                             ["po1", "2026-09-05", "payout", "-9.00", "0", "-9.00", "usd"]])
         inputs.ingest_stripe_csv(self.month, P, [a, b], "100", "100", self.man)
-        rows = list(csv.DictReader(open(self.inp / "stripe.csv")))
+        with open(self.inp / "stripe.csv") as f:
+            rows = list(csv.DictReader(f))
         self.assertEqual(len(rows), 2)
         self.assertEqual(self.man.data["stripe_balance"]["source"], "typed")
 
@@ -237,3 +239,23 @@ class TestMatchingUnits(unittest.TestCase):
         added = [self.b("h1", "2026-09-20", "50000", prior=True)]
         m = self.match([], added, [self.s("prior:2:0", "2026-09-20", "50000", prior=True)], 5, date(2026, 10, 26))
         self.assertFalse(m.book_left or m.bank_left)
+
+
+class TestCsvFormulaCells(unittest.TestCase):
+    """Text from QuickBooks, Stripe or a bank must not run as a formula when a CSV is opened in a spreadsheet."""
+
+    def test_formula_text_is_escaped_and_round_trips(self):
+        import tempfile
+        from pathlib import Path
+        from mer.util import read_csv, write_csv
+        rows = [{"memo": '=HYPERLINK("http://x.example","Click")'}, {"memo": "+1 555 0100"}, {"memo": "@SUM(A1)"},
+                {"memo": "-Transfer"}, {"memo": "-600.00"}, {"memo": "Rent"}, {"memo": D("-600")}]
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "x.csv"
+            write_csv(path, rows, ["memo"])
+            raw = path.read_text().splitlines()[1:]
+            self.assertEqual(raw[0][:3], "\"'=")              # quoted by csv, then the ' that makes it text
+            self.assertEqual(raw[1:4], ["'+1 555 0100", "'@SUM(A1)", "'-Transfer"])
+            self.assertEqual(raw[4:], ["-600.00", "Rent", "-600.00"])   # plain numbers stay numbers
+            back = [r["memo"] for r in read_csv(path)]
+        self.assertEqual(back[:6], [r["memo"] for r in rows[:6]])

@@ -77,8 +77,8 @@ entries added to or voided in the reviewed month after its review. For the first
 ## review-config.json
 
 `init` proposes it from the chart of accounts and QuickBooks preferences. A person checks it, then
-`confirm-roles --by NAME` records who and when. Any later change to the roles or `accrual_behavior` needs
-confirming again.
+`confirm-roles --by NAME` records who and when. Any later change to the roles, `accrual_behavior` or
+`payroll_cogs_pct` needs confirming again.
 
 - **`basis`:** `"Accrual"` or `"Cash"`.
 - **`fiscal_year_start_month`:** a number from 1 to 12.
@@ -96,6 +96,10 @@ confirming again.
   for none. Every Bank or Credit Card account with activity must be in `cash`, `card` or `processor_clearing`.
 - **`accrual_behavior`:** `"reversing"` (default: last month's balance should be released) or `"rollforward"`
   (builds up on purpose: bonus, audit fees, PTO), per accrued account.
+- **`payroll_cogs_pct`:** the share of payroll, from 0 to 100, that belongs in cost of sales (field, delivery or
+  support staff), or `0` if none does. It's a person's answer, and K5 compares each month's split with it. Leave
+  it `null` if nobody knows: K5 then compares with the last 6 months, and shows NOT RUN if none of that payroll
+  was in cost of sales. List the cost-of-sales wage accounts in `roles.payroll_wages`.
 - **`bank_formats`, `payroll_format`, `budget_name`:** as above.
 - **`thresholds`:** see `scripts/mer/config.py`. Numbers may be written with or without quotes.
 

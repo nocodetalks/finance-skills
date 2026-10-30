@@ -57,6 +57,28 @@ class TestVerifyWorkflow(VerifyBase):
         self.assertEqual(rc, 1)
         self.assertIn("doesn't match what the inputs produce", out)
 
+    def test_results_json_wording_tamper(self):
+        # Not just the numbers: an edited title or status would reach the chat through `mer.py summary`.
+        self.write()
+        p = self.out / "results.json"
+        res = json.loads(p.read_text())
+        res["exceptions"][0]["title"] = "Nothing to see here"
+        res["exceptions"][0]["severity"] = "low"
+        p.write_text(json.dumps(res))
+        rc, out = self.verify()
+        self.assertEqual(rc, 1)
+        self.assertIn("doesn't match what the inputs produce", out)
+
+    def test_no_stored_hash_to_rewrite(self):
+        # verify rebuilds the documents from the inputs; there is no hash file to rewrite after an edit.
+        self.write()
+        self.assertFalse((self.out / ".integrity.json").exists())
+        p = self.out / "review.md"
+        p.write_text(p.read_text().replace("| Mercury Treasury |", "| Mercury Treasury (fine) |", 1))
+        rc, out = self.verify()
+        self.assertEqual(rc, 1)
+        self.assertIn("outside the marked sections", out)
+
     def test_edit_outside_markers(self):
         self.write()
         p = self.out / "review.md"

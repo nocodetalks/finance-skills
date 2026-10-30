@@ -15,7 +15,8 @@ import re
 from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
 from pathlib import Path
 
-from .outputs import MARKERS, PLACEHOLDER, normalized, text_hash
+from .outputs import MARKERS, PLACEHOLDER, normalized
+from .util import _json_default
 from .util import MONTH_NAMES, StopRun
 
 WHITELIST = re.compile(
@@ -184,38 +185,43 @@ def _sections(text: str, name: str) -> list[tuple[str, str | None]]:
     return out
 
 
-def _recompute_facts(month_dir: Path) -> list | None:
-    """Re-run the gate and checks from inputs/ and return the facts, or None if that isn't possible."""
+def _rebuild(month_dir: Path, stored: dict):
+    """Re-run the gate and checks from inputs/ and rebuild results.json and both documents, or None if the inputs no
+    longer pass the gate. Nothing stored next to the outputs is trusted: a hash file there can be rewritten as easily
+    as the outputs it protects."""
     from . import config
     from .checks import run_all
     from .data import load
     from .gate import run_gate
-    from .outputs import build_results
+    from .outputs import build_results, render, render_update
     from .util import Period
     root, period = month_dir.parent, Period(month_dir.name)
     d = load(month_dir, period, config.load(root))
     if run_gate(d):
         return None
     results, exc, ctx = run_all(d, root)
-    return build_results(d, results, exc, ctx)["facts"]
+    res = build_results(d, results, exc, ctx)
+    res["meta"]["generated_at"] = (stored.get("meta") or {}).get("generated_at", "")   # the one value that varies
+    docs = {"review.md": render(d, res, results), "investor-update.md": render_update(d, res)}
+    return json.loads(json.dumps(res, default=_json_default)), docs
 
 
 def verify(month_dir: Path) -> list[str]:
     out = month_dir / "output"
     problems = []
-    integ_p = out / ".integrity.json"
-    if not integ_p.exists() or not (out / "results.json").exists():
+    if not (out / "results.json").exists():
         raise StopRun("No review to verify. Run `mer.py run` first.")
-    integ = json.loads(integ_p.read_text())
     results = json.loads((out / "results.json").read_text())
-    fresh = _recompute_facts(month_dir)
-    if fresh is None:
+    rebuilt = _rebuild(month_dir, results)
+    if rebuilt is None:
         problems.append("The inputs no longer pass the gate. Re-run the review.")
-        fresh = []
-    key = lambda f: (f["label"], f["value"], f["unit"])
-    if sorted(map(key, fresh)) != sorted(map(key, results.get("facts", []))):
-        problems.append("results.json doesn't match what the inputs produce now (it was edited, or the inputs or "
-                        "acknowledgements changed). Re-run the review.")
+        fresh_res, docs = {"facts": []}, {}
+    else:
+        fresh_res, docs = rebuilt
+        if fresh_res != results:
+            problems.append("results.json doesn't match what the inputs produce now (it was edited, or the inputs or "
+                            "acknowledgements changed). Re-run the review.")
+    fresh = fresh_res["facts"]
     facts, refs = Facts(fresh), known_refs(results)
     for name in ("review.md", "investor-update.md"):
         p = out / name
@@ -223,7 +229,7 @@ def verify(month_dir: Path) -> list[str]:
             problems.append(f"{name} is missing. Re-run.")
             continue
         text = p.read_text(encoding="utf-8")
-        if text_hash(normalized(text, name)) != integ.get(name):
+        if name in docs and normalized(text, name) != normalized(docs[name], name):
             problems.append(f"{name}: text outside the marked sections was changed. Only write between the markers.")
         for marker, body in _sections(text, name):
             label = marker.replace("<!-- ", "").replace(":start -->", "")

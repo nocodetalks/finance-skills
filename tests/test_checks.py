@@ -138,6 +138,27 @@ class TestPlantedMistakes(Base):
     def test_bridges_add_up(self):
         self.assertTrue(self.results["V1"].data["bridge_check"]["adds_up"])
 
+    # The one-sided $50k treasury move, booked to Uncategorized Expense, is K4's mirror case.
+    def test_k4_mirror_leads_the_treasury_item(self):
+        e = next(e for e in self.exc["open"] if "Uncategorized" in e["title"])
+        self.assertEqual(e["check"], "K4")
+        self.assertIn("transfer to Mercury Treasury, not an expense", e["title"])
+        self.assertEqual(sorted(a["check"] for a in e["also"]), ["K1", "T1"])
+        self.assertIn("bank/2.csv row 2", e["refs"])
+        draft = next(x for x in self.results["K4"].drafts)
+        self.assertEqual(draft["status"], "confirm first")
+        self.assertEqual([(l["account"], l["debit"], l["credit"]) for l in draft["lines"]],
+                         [("Mercury Treasury", D("50000"), None), ("Uncategorized Expense", None, D("50000"))])
+
+    def test_k4_leaves_stripe_deposits_to_t3_t4(self):
+        # Northwind's bank calls Stripe payouts "STRIPE TRANSFER"; they're processor activity, not own-account moves.
+        self.assertEqual([e["kind"] for e in self.results["K4"].exceptions], ["transfer-expense"])
+
+    def test_new_checks_in_coverage(self):
+        self.assertEqual(self.results["C5"].status, "pass")
+        self.assertEqual(self.results["K5"].status, "not_run")
+        self.assertIn('"payroll_cogs_pct"', self.results["K5"].reason)
+
 
 # ---------------------------------------------------------------- scenarios
 
@@ -728,3 +749,337 @@ class TestBookedIntoLastMonthAfterReview(Base):
 
 
 import csv  # noqa: E402
+
+
+# ---------------------------------------------------------------- AI-bookkeeping failures (2026-10-30)
+# From a real report: transfers booked as income, one vendor under two names, contractor payroll not split
+# between cost of sales and admin.
+
+from fixture_northwind import HISTORY  # noqa: E402
+from mer import config as _config  # noqa: E402
+from mer.checks.completeness import similar_vendors  # noqa: E402
+from mer.util import StopRun, vendor_key  # noqa: E402
+
+
+def k4(exc):
+    return [(c, t) for c, t in everything(exc) if c == "K4"]
+
+
+def transfer_as_revenue(stage, b, x):
+    if stage == "september":
+        b.txn("Deposit", d("2026-09", 10), "", "Deposit", [("1", 5000), ("22", -5000)])
+        x["checking"].append((d("2026-09", 10), "DEPOSIT", 5000))
+        x["treasury"].append((d("2026-09", 8), "WITHDRAWAL", -5000))     # two days earlier, not in the books
+
+
+class TestTransferBookedAsRevenue(Base):
+    scenario = staticmethod(transfer_as_revenue)
+
+    def test_flagged_and_grouped_with_the_missing_withdrawal(self):
+        results, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K4", "$5,000.00", "Services Revenue", "transfer from Mercury Treasury",
+                        "not income")
+        e = next(e for e in exc["open"] if e["check"] == "K4" and "5,000" in e["title"])
+        self.assertIn("T1", [a["check"] for a in e["also"]])          # Treasury's statement row isn't in the books
+        self.assertTrue(any(r.startswith("GL ") for r in e["refs"]))
+        self.assertIn("transfer from Mercury Treasury to Mercury Checking", e["action"])
+        self.assertEqual(e["severity"], "high")                       # medium, raised at $5,000
+        draft = next(x for x in results["K4"].drafts if "5,000" in x["memo"])
+        self.assertEqual([(l["account"], l["debit"], l["credit"]) for l in draft["lines"]],
+                         [("Services Revenue", D("5000"), None), ("Mercury Treasury", None, D("5000"))])
+
+    def test_window_is_configurable(self):
+        c = self.cfg()
+        c["thresholds"] = {"transfer_window_days": 1}
+        self.save_cfg(c)
+        _, exc, _ = self.review()
+        self.assertFalse([t for c, t in k4(exc) if "5,000" in t])
+
+
+def transfer_by_memo_and_own_name(stage, b, x):
+    if stage == "september":
+        b.txn("Deposit", d("2026-09", 11), "", "Internal transfer from savings", [("1", 2000), ("21", -2000)])
+        x["checking"].append((d("2026-09", 11), "INTERNAL TRANSFER", 2000))
+        b.txn("Deposit", d("2026-09", 16), "Northwind SaaS", "", [("1", 3500), ("22", -3500)])
+        x["checking"].append((d("2026-09", 16), "NORTHWIND SAAS INC", 3500))
+        x["config"]["company"] = "Northwind SaaS Inc"
+
+
+class TestTransferByWording(Base):
+    scenario = staticmethod(transfer_by_memo_and_own_name)
+
+    def test_memo_and_company_name(self):
+        _, exc, _ = self.review()
+        titles = everything(exc)
+        self.assertFlag(titles, "K4", "$2,000.00", "Interest Income", "between your own accounts", "not income")
+        self.assertFlag(titles, "K4", "$3,500.00", "Services Revenue", "between your own accounts")
+
+
+def transfer_both_sides_miscoded(stage, b, x):
+    if stage == "september":
+        b.txn("Expense", d("2026-09", 12), "", "Withdrawal", [("35", 8000), ("2", -8000)])
+        x["treasury"].append((d("2026-09", 12), "WITHDRAWAL", -8000))
+        b.txn("Deposit", d("2026-09", 13), "", "Deposit", [("1", 8000), ("22", -8000)])
+        x["checking"].append((d("2026-09", 13), "DEPOSIT", 8000))
+
+
+class TestTransferBothSidesMiscoded(Base):
+    scenario = staticmethod(transfer_both_sides_miscoded)
+
+    def test_one_item_for_both_sides(self):
+        results, exc, _ = self.review()
+        mine = [e for e in results["K4"].exceptions if "8,000" in e["title"]]
+        self.assertEqual(len(mine), 1, mine)                          # not flagged again as the mirror case
+        self.assertIn("transfer from Mercury Treasury, not income", mine[0]["title"])
+        self.assertEqual(len(mine[0]["txns"]), 2)
+        draft = next(x for x in results["K4"].drafts if "8,000" in x["memo"])
+        self.assertEqual([l["account"] for l in draft["lines"]], ["Services Revenue", "Office Supplies"])
+
+
+def transfer_double_booked(stage, b, x):
+    if stage == "september":
+        b.txn("Transfer", d("2026-09", 16), "", "Transfer", [("1", 4000), ("2", -4000)])
+        b.txn("Deposit", d("2026-09", 16), "", "Deposit", [("1", 4000), ("22", -4000)])  # the feed's copy, as revenue
+        x["checking"].append((d("2026-09", 16), "FROM TREASURY", 4000))
+        x["treasury"].append((d("2026-09", 16), "TO CHECKING", -4000))
+
+
+class TestTransferAlsoBookedAsRevenue(Base):
+    scenario = staticmethod(transfer_double_booked)
+
+    def test_flagged(self):
+        _, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K4", "$4,000.00", "transfer from Mercury Treasury")
+
+
+def card_payment_as_expense(stage, b, x):
+    if stage == "september":
+        b.txn("Expense", d("2026-09", 26), "", "Credit card payment", [("35", 1200), ("1", -1200)])
+        x["checking"].append((d("2026-09", 26), "BREX PAYMENT", -1200))
+        x["brex"].append((d("2026-09", 27), "PAYMENT", 1200))
+
+
+class TestCardPaymentBookedAsExpense(Base):
+    scenario = staticmethod(card_payment_as_expense)
+
+    def test_flagged(self):
+        _, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K4", "$1,200.00", "Office Supplies", "transfer to Brex Card", "not an expense")
+        e = next(e for e in exc["open"] if "1,200" in e["title"] or any("1,200" in a["title"] for a in e["also"]))
+        self.assertIn("credit card payment", e["action"])
+
+
+def transfer_lookalikes(stage, b, x):
+    if stage == "september":
+        # A customer deposit and an unrelated check of the same amount on the same day.
+        b.txn("Deposit", d("2026-09", 14), "Customer Q", "Implementation fee", [("1", 2500), ("22", -2500)])
+        x["checking"].append((d("2026-09", 14), "ACH CREDIT CUSTOMER Q", 2500))
+        b.txn("Check", d("2026-09", 14), "Bob Builder", "Office repairs", [("39", 2500), ("2", -2500)])
+        x["treasury"].append((d("2026-09", 14), "CHECK 2201", -2500))
+        # A customer's wire.
+        b.txn("Deposit", d("2026-09", 15), "Globex", "Incoming wire transfer", [("1", 7000), ("22", -7000)])
+        x["checking"].append((d("2026-09", 15), "INCOMING WIRE TRANSFER GLOBEX", 7000))
+        # A transfer booked right, next to a customer deposit of the same amount.
+        b.txn("Transfer", d("2026-09", 16), "", "Sweep from treasury", [("1", 3000), ("2", -3000)])
+        x["checking"].append((d("2026-09", 16), "FROM TREASURY", 3000))
+        x["treasury"].append((d("2026-09", 16), "TO CHECKING", -3000))
+        b.txn("Deposit", d("2026-09", 17), "Customer R", "Setup fee", [("1", 3000), ("22", -3000)])
+        x["checking"].append((d("2026-09", 17), "ACH CREDIT CUSTOMER R", 3000))
+
+
+class TestTransferLookalikesNotFlagged(Base):
+    scenario = staticmethod(transfer_lookalikes)
+
+    def test_no_false_flags(self):
+        _, exc, _ = self.review()
+        titles = [t for _, t in k4(exc)]
+        for amount in ("2,500", "7,000", "3,000"):
+            self.assertFalse([t for t in titles if amount in t], titles)
+
+
+class TestVendorKey(unittest.TestCase):
+    def test_variants_match(self):
+        for a, b in [("The Home Depot #4521", "Home Depot"), ("THE HOME DEPOT #4521 ATLANTA GA", "Home Depot, Inc."),
+                     ("SQ *BLUE BOTTLE COFFEE", "Blue Bottle Coffee"), ("TST* Joe's Pizza", "Joes Pizza"),
+                     ("PAYPAL *ADOBE", "Adobe"), ("Notion, Inc.", "Notion"), ("Acme & Co.", "ACME"),
+                     ("Amazon.com", "Amazon"), ("WALGREENS STORE 1234", "Walgreens"), ("AT&T", "ATT"),
+                     ("Cooley L.L.P.", "Cooley LLP"), ("We Work", "WeWork"), ("7-Eleven #12345", "7-Eleven")]:
+            self.assertEqual(vendor_key(a), vendor_key(b), (a, b))
+
+    def test_different_vendors_stay_apart(self):
+        for a, b in [("Building 1 LLC", "Building 2 LLC"), ("Amazon", "Amazon Web Services"), ("7-Eleven", "Eleven"),
+                     ("Smith Plumbing", "Smyth Plumbing"), ("Notion", "Notion Labs")]:
+            self.assertNotEqual(vendor_key(a), vendor_key(b), (a, b))
+
+    def test_near_identical(self):
+        cfg = {"thresholds": {"vendor_match_min_length": 8, "vendor_similarity_pct": D("90")}}
+        self.assertTrue(similar_vendors("acmedesign", "acmedesigns", cfg))
+        self.assertTrue(similar_vendors("johnsonconsulting", "jonsonconsulting", cfg))
+        self.assertFalse(similar_vendors("smithplumbing", "smythplumbing", cfg))      # a swapped letter
+        self.assertFalse(similar_vendors("unit4properties", "unit7properties", cfg))  # a different number
+        self.assertFalse(similar_vendors("stripe", "stripes", cfg))                   # too short to judge
+        self.assertFalse(similar_vendors("notion", "notionlabs", cfg))
+
+
+def vendor_variants(stage, b, x):
+    if stage == "history":
+        for m in HISTORY[1:]:
+            b.txn("Expense", d(m, 10), "Home Depot", "Supplies", [("35", 450), ("3", -450)])
+    else:
+        b.txn("Expense", d("2026-09", 10), "Home Depot", "Supplies", [("35", 450), ("3", -450)])
+        b.txn("Expense", d("2026-09", 12), "THE HOME DEPOT #4521", "Supplies", [("35", 450), ("3", -450)])
+        b.txn("Expense", d("2026-09", 7), "Notion, Inc.", "Notion workspace", [("34", 300), ("3", -300)])
+        x["brex"] += [(d("2026-09", 10), "HOME DEPOT", -450), (d("2026-09", 12), "THE HOME DEPOT #4521", -450),
+                      (d("2026-09", 7), "NOTION", -300)]
+
+
+class TestVendorNameVariants(Base):
+    scenario = staticmethod(vendor_variants)
+
+    def test_duplicate_found_across_names(self):
+        _, exc, _ = self.review()
+        self.assertFlag(everything(exc), "C1", "Possible duplicate", "Home Depot / THE HOME DEPOT #4521", "$450.00")
+
+    def test_renamed_vendor_is_not_missing(self):
+        _, exc, _ = self.review()
+        self.assertNoFlag(everything(exc), "Notion", "nothing in September")
+
+    def test_duplicate_vendor_records(self):
+        results, exc, _ = self.review()
+        titles = everything(exc)
+        self.assertFlag(titles, "C5", "duplicate vendor records", "\"Home Depot\"", "\"THE HOME DEPOT #4521\"")
+        self.assertFlag(titles, "C5", "duplicate vendor records", "\"Notion\"", "\"Notion, Inc.\"")
+        e = next(e for e in results["C5"].exceptions if "Notion" in e["title"])
+        self.assertEqual(e["severity"], "low")
+        self.assertEqual(e["amount"], D("300"))                    # what's booked under the less-used name
+        self.assertTrue(e["refs"] and all(r.startswith("GL ") for r in e["refs"]))
+        self.assertIn("merge them in QuickBooks", e["action"])
+        self.assertEqual(e["accounts"], [])                         # a vendor record doesn't make a P&L line unreliable
+
+
+def vendor_near_names(stage, b, x):
+    if stage == "history":
+        for m in HISTORY[1:]:
+            b.txn("Expense", d(m, 11), "Linear Software", "Linear seats", [("34", 400), ("3", -400)])
+            b.txn("Check", d(m, 15), "Smith Plumbing", "Repairs", [("35", 600), ("1", -600)])
+            b.txn("Check", d(m, 16), "Building 1 LLC", "Storage unit", [("36", 900), ("1", -900)])
+            b.txn("Check", d(m, 17), "Pacific Gas", "Utilities", [("35", 250), ("1", -250)])
+    else:
+        b.txn("Expense", d("2026-09", 11), "Linear Softwares", "Linear seats", [("34", 400), ("3", -400)])
+        b.txn("Bill", d("2026-09", 8), "Acme Designs", "Logo refresh", [("39", 900), ("6", -900)])
+        b.txn("Check", d("2026-09", 15), "Smyth Plumbing", "Repairs", [("35", 700), ("1", -700)])
+        b.txn("Check", d("2026-09", 16), "Building 2 LLC", "Storage unit", [("36", 900), ("1", -900)])
+        b.txn("Check", d("2026-09", 17), "Pacific Glass", "Window", [("39", 260), ("1", -260)])
+        x["brex"].append((d("2026-09", 11), "LINEAR", -400))
+        x["checking"] += [(d("2026-09", 15), "CHECK", -700), (d("2026-09", 16), "CHECK", -900),
+                          (d("2026-09", 17), "CHECK", -260)]
+
+
+class TestNearIdenticalVendorNames(Base):
+    scenario = staticmethod(vendor_near_names)
+
+    def test_near_names_flagged_and_lookalikes_not(self):
+        results, exc, _ = self.review()
+        c5 = [(c, t) for c, t in everything(exc) if c == "C5"]
+        self.assertFlag(c5, "C5", "\"Linear Software\"", "\"Linear Softwares\"")
+        self.assertFlag(c5, "C5", "\"Acme Design\"", "\"Acme Designs\"")
+        for other in ("Smyth", "Building 2", "Pacific Glass"):   # a swapped letter, a different number, another account
+            self.assertNoFlag(c5, other)
+        self.assertEqual(len(c5), 2, c5)
+
+    def test_missing_recurring_points_at_the_near_name(self):
+        results, _, _ = self.review()
+        e = next(e for e in results["C1"].exceptions if e["kind"] == "missing-recurring" and "Linear" in e["title"])
+        self.assertIn("\"Linear Softwares\", a near-identical name", e["detail"])
+
+
+def payroll_split(sep_cogs=0, person=False, expected=None, history=True):
+    """Support wages in cost of sales: $20,000 a month in the history, `sep_cogs` in September."""
+    def scenario(stage, b, x):
+        if stage == "history":
+            b.account("44", "Cost of Revenue:Support Wages", "Cost of Goods Sold", "CostOfLaborCos", "Expense")
+            x["roles"]["payroll_wages"] = ["Payroll Expenses:Wages", "Cost of Revenue:Support Wages"]
+            if expected is not None:
+                x["config"]["payroll_cogs_pct"] = expected
+            for m in HISTORY if history else []:
+                b.txn("Payroll Check", d(m, 14), "Gusto", "Payroll", [("44", 20000), ("1", -20000)])
+            return
+        if sep_cogs:
+            b.txn("Payroll Check", d("2026-09", 15), "Gusto", "Payroll", [("44", sep_cogs), ("1", -sep_cogs)])
+            x["checking"].append((d("2026-09", 15), "GUSTO PAYROLL", -sep_cogs))
+        if person:
+            b.txn("Paycheck", d("2026-09", 16), "Jane Doe", "Support shift pay", [("44", 3000), ("1", -3000)])
+            x["checking"].append((d("2026-09", 16), "PAYROLL JANE DOE", -3000))
+    return scenario
+
+
+def k5_text(results):
+    return " ".join(f"{e['title']} {e['detail']} {e['refs']}" for e in results["K5"].exceptions) + results["K5"].summary
+
+
+class TestPayrollAllInOpex(Base):
+    scenario = staticmethod(payroll_split())
+
+    def test_flagged(self):
+        results, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K5", "All of September 2026's payroll ($64,500.00) is in operating expenses",
+                        "13.4% in the last 6 months")
+        e = results["K5"].exceptions[0]
+        self.assertEqual(e["amount"], D("8643.00"))                  # 13.4% of $64,500, to the bottom of the range
+        self.assertEqual(e["severity"], "high")
+        self.assertTrue(any(r.startswith("GL ") for r in e["refs"]))
+        self.assertEqual(results["K5"].drafts[0]["status"], "needs your amount")
+        self.assertEqual(results["K5"].drafts[0]["lines"][0]["account"], "Cost of Revenue:Support Wages")
+
+
+class TestPayrollSplitAsUsual(Base):
+    scenario = staticmethod(payroll_split(sep_cogs=10000))
+
+    def test_not_flagged(self):
+        results, _, _ = self.review()
+        self.assertEqual(results["K5"].status, "pass", results["K5"].exceptions)
+        self.assertIn("13.4%", results["K5"].summary)
+
+
+class TestPayrollTooMuchInCostOfSales(Base):
+    scenario = staticmethod(payroll_split(sep_cogs=40000, person=True))
+
+    def test_flagged_without_people(self):
+        results, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K5", "40.0% of September 2026's payroll is in cost of sales")
+        self.assertNotIn("Jane Doe", k5_text(results))
+
+
+class TestPayrollSplitFromConfig(Base):
+    scenario = staticmethod(payroll_split(expected=30, history=False))
+
+    def test_expected_split_without_history(self):
+        results, exc, _ = self.review()
+        self.assertFlag(everything(exc), "K5", "in operating expenses", "review-config.json expects 30%")
+
+
+class TestPayrollSplitConfigSaysNone(Base):
+    scenario = staticmethod(payroll_split(expected=0, history=False))
+
+    def test_runs_and_passes(self):
+        results, _, _ = self.review()
+        self.assertEqual(results["K5"].status, "pass")
+
+
+class TestPayrollSplitConfigKey(Base):
+    def test_bad_values_stop(self):
+        for bad in (150, -1, "about a third", True):
+            c = self.cfg()
+            c["payroll_cogs_pct"] = bad
+            self.save_cfg(c, reconfirm=False)
+            with self.assertRaises(StopRun, msg=bad):
+                _config.load(self.root)
+
+    def test_a_person_confirms_it(self):
+        c = self.cfg()
+        c["payroll_cogs_pct"] = 25
+        self.save_cfg(c, reconfirm=False)
+        self.assertIn("payroll_cogs_pct) changed after", self.gate_text())
+        config_ok = self.cfg()
+        self.save_cfg(config_ok)                                     # confirm-roles again
+        self.assertEqual(self.gates(), [])

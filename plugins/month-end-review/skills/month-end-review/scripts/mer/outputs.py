@@ -1,4 +1,4 @@
-"""Write the review into an output folder: results.json, CSVs, review.md, investor-update.md, .integrity.json.
+"""Write the review into an output folder: results.json, CSVs, review.md and investor-update.md.
 
 The model later writes only between the markers. `verify` checks nothing outside the markers
 changed (and results.json is untouched), then checks every number written between them.
@@ -6,7 +6,6 @@ changed (and results.json is untouched), then checks every number written betwee
 
 from __future__ import annotations
 
-import hashlib
 import re
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -38,10 +37,6 @@ def normalized(text: str, name: str) -> str:
     for s, e in MARKERS[name]:
         text = re.sub(re.escape(s) + r".*?" + re.escape(e), f"{s}\n{PLACEHOLDER}\n{e}", text, flags=re.S)
     return text
-
-
-def text_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
 
 def _drafts(d: Data, results: list[CheckResult]) -> tuple[list, dict]:
@@ -192,9 +187,6 @@ def write_all(d: Data, out: Path, results: list[CheckResult], exc: dict, ctx: di
     update = render_update(d, res)
     (out / "review.md").write_text(review, encoding="utf-8")
     (out / "investor-update.md").write_text(update, encoding="utf-8")
-    write_json(out / ".integrity.json", {"results.json": sha256(out / "results.json"),
-                                         "review.md": text_hash(normalized(review, "review.md")),
-                                         "investor-update.md": text_hash(normalized(update, "investor-update.md"))})
     return res
 
 
