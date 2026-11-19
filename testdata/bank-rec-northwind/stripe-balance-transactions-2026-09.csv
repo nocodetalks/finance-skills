@@ -1,0 +1,26 @@
+balance_transaction_id,created_utc,reporting_category,gross,fee,net,currency,description
+txn_ch00,2026-09-01 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #0
+txn_ch01,2026-09-02 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #1
+txn_ch02,2026-09-03 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #2
+txn_ch03,2026-09-04 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #3
+txn_ch04,2026-09-05 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #4
+txn_ch05,2026-09-06 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #5
+txn_ch06,2026-09-07 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #6
+txn_ch07,2026-09-08 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #7
+txn_ch08,2026-09-09 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #8
+txn_ch09,2026-09-10 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #9
+txn_ch10,2026-09-11 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #10
+txn_ch11,2026-09-12 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #11
+txn_ch12,2026-09-13 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #12
+txn_ch13,2026-09-14 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #13
+txn_ch14,2026-09-15 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #14
+txn_ch15,2026-09-16 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #15
+txn_ch16,2026-09-17 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #16
+txn_ch17,2026-09-18 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #17
+txn_ch18,2026-09-19 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #18
+txn_ch19,2026-09-20 14:00:00,charge,2500.00,74.00,2426.00,usd,Subscription #19
+txn_re01,2026-09-09 14:00:00,refund,-600.00,0.00,-600.00,usd,Refund
+po_01,2026-09-05 14:00:00,payout,-12000.00,0.00,-12000.00,usd,STRIPE PAYOUT
+po_02,2026-09-15 14:00:00,payout,-11000.00,0.00,-11000.00,usd,STRIPE PAYOUT
+po_03,2026-09-25 14:00:00,payout,-13000.00,0.00,-13000.00,usd,STRIPE PAYOUT
+po_04,2026-09-30 14:00:00,payout,-11920.00,0.00,-11920.00,usd,STRIPE PAYOUT

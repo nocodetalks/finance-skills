@@ -15,7 +15,31 @@
       "description": "Checks a closed month is right (cash, card, AR/AP, Stripe and payroll tie-outs; missing, duplicate and late bills; accruals, prepaids, deferred revenue; wrong accounts), then writes variance commentary and an investor-update draft with every number traced to source rows. Read-only.",
       "version": "0.1.0",
       "category": "finance",
-      "keywords": ["finance", "accounting", "month-end", "close", "quickbooks", "stripe", "variance", "reconciliation"]
+      "keywords": [
+        "finance",
+        "accounting",
+        "month-end",
+        "close",
+        "quickbooks",
+        "stripe",
+        "variance",
+        "reconciliation"
+      ]
+    },
+    {
+      "name": "bank-reconciliation",
+      "source": "./plugins/bank-reconciliation",
+      "description": "Explains why QuickBooks and the bank statement don't match: matches every line, names each cause (in transit, missing entries, typos, duplicates, refunds paid from Stripe, transfers booked as expenses), bridges each account to the cent and drafts the fixes for a person to approve. Read-only.",
+      "version": "0.1.0",
+      "category": "finance",
+      "keywords": [
+        "finance",
+        "accounting",
+        "bank reconciliation",
+        "reconciliation",
+        "quickbooks",
+        "stripe"
+      ]
     }
   ]
 }

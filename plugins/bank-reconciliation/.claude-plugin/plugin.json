@@ -1,0 +1,13 @@
+{
+  "name": "bank-reconciliation",
+  "version": "0.1.0",
+  "description": "Read-only bank and card reconciliation for QuickBooks Online: explains why the book balance and the statement differ, bridges every account to the cent (timing, missing entries, typos, duplicates, refunds paid from Stripe, transfers booked as expenses), and drafts each fix for a person to approve. Reads the books through any QuickBooks connector. Stops when an input is missing or doesn't add up.",
+  "author": {
+    "name": "nocodetalks",
+    "url": "https://github.com/nocodetalks"
+  },
+  "homepage": "https://github.com/nocodetalks/finance-skills/tree/main/plugins/bank-reconciliation",
+  "repository": "https://github.com/nocodetalks/finance-skills",
+  "license": "MIT",
+  "keywords": ["finance", "accounting", "bank reconciliation", "reconciliation", "quickbooks", "stripe", "bank statement"]
+}

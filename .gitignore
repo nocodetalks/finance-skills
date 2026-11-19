@@ -7,3 +7,5 @@ month-end/
 .env
 .env.*
 *.env
+# Bank reconciliation work folders hold real financial data. Never commit them.
+bank-rec/

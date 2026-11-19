@@ -1,0 +1,19 @@
+txn_id,txn_type,date,account,name,memo,doc_num,amount
+240,Expense,2026-09-01,Mercury Checking,HubSpot,HubSpot annual plan,,-12000.00
+239,Deposit,2026-09-01,Mercury Checking,Acme Corp,Annual plan Sep 2026 - Aug 2027,,6000.00
+242,Check,2026-09-05,Mercury Checking,WeWork,Rent,,-6000.00
+245,Deposit,2026-09-07,Mercury Checking,Stripe,Stripe payout,,12000.00
+247,Refund,2026-09-10,Mercury Checking,Stripe customer,Refund,1039,-600.00
+248,Refund,2026-09-11,Mercury Checking,Stripe customer,Refund,1040,-600.00
+249,Bill Payment (Check),2026-09-12,Mercury Checking,Acme Design,,,-2400.00
+251,Check,2026-09-15,Mercury Checking,Gusto,Payroll,,-64500.00
+253,Expense,2026-09-20,Mercury Checking,,Transfer to treasury,,-50000.00
+255,Payment,2026-09-22,Mercury Checking,Gamma LLC,Check deposit,,1350.00
+257,Deposit,2026-09-27,Mercury Checking,Stripe,Stripe payout,,13000.00
+258,Transfer,2026-09-28,Mercury Checking,,Card payment,,-1080.00
+261,Deposit,2026-09-30,Mercury Checking,Stripe,Stripe payout,,11920.00
+256,Deposit,2026-09-25,Mercury Treasury,Mercury,Treasury interest,,4100.00
+244,Expense,2026-09-06,Brex Card,Figma,Figma seats,,-480.00
+246,Expense,2026-09-09,Brex Card,Sweetgreen,Team lunch,,-300.00
+252,Expense,2026-09-19,Brex Card,Nobu,Dinner,,-420.00
+258,Transfer,2026-09-28,Brex Card,,Card payment,,1080.00
