@@ -1,5 +1,28 @@
 # Changelog
 
+## bank-reconciliation 0.1.0 (new skill)
+
+Explains why a bank or card account's QuickBooks balance doesn't match the statement, and drafts the fixes.
+Read-only.
+
+- **Inputs.**
+  - The books come in through any QuickBooks connector: Claude copies the lines into one file, and `add-books`
+    stops unless opening + lines = closing. QuickBooks exports work too, with column mapping.
+  - Statement CSVs are read with automatic columns, pending rows dropped, and opening + rows = closing.
+  - The Stripe balance transactions export is optional.
+- **Causes.**
+  - Timing: deposits in transit (Stripe payouts confirmed against Stripe), checks and payments not cleared yet.
+  - Book errors: missing entries (with the payee's last entry as a template), unrecorded Stripe payouts, transposed
+    amounts, duplicates, refunds paid from Stripe booked against the bank, transfers booked as expenses, payments
+    booked to the wrong bank account, last month's unposted fixes.
+  - Needs a decision: book payments never on the statement, unproven duplicates, stale items, opening differences.
+- **Never calls an unexplained book payment an outstanding check.** That was the failure in both naive runs on
+  Northwind.
+- Each account is bridged to the cent and the run asserts it. Drafts are *ready* only when two sources agree.
+- Uncleared items and unposted fixes carry into next month.
+- **Tests:** 20 new (247 in all), on Northwind's September close: all six planted causes found with Stripe, and every
+  account bridged to $0.00.
+
 ## Unreleased
 
 Three checks from a real report of AI bookkeeping failures: transfers booked as income, one vendor under two

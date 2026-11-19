@@ -1,0 +1,13 @@
+Date (UTC),Description,Amount,Status,Source Account
+09-01-2026,WIRE IN ACME CORP,6000.00,Sent,Mercury Checking ••4821
+09-01-2026,HUBSPOT,-12000.00,Sent,Mercury Checking ••4821
+09-08-2026,CHECK 1041 WEWORK,-6000.00,Sent,Mercury Checking ••4821
+09-07-2026,STRIPE TRANSFER,12000.00,Sent,Mercury Checking ••4821
+09-12-2026,ACME DESIGN,-2400.00,Sent,Mercury Checking ••4821
+09-15-2026,GUSTO PAYROLL,-64500.00,Sent,Mercury Checking ••4821
+09-17-2026,STRIPE TRANSFER,11000.00,Sent,Mercury Checking ••4821
+09-20-2026,TRANSFER TO TREASURY,-50000.00,Sent,Mercury Checking ••4821
+09-22-2026,CHECK DEPOSIT,1530.00,Sent,Mercury Checking ••4821
+09-27-2026,STRIPE TRANSFER,13000.00,Sent,Mercury Checking ••4821
+09-28-2026,BREX PAYMENT,-1080.00,Sent,Mercury Checking ••4821
+09-30-2026,GUSTO PAYROLL,-64500.00,Sent,Mercury Checking ••4821

@@ -14,6 +14,7 @@ These skills share three rules:
 | Skill | Status | What it does |
 |---|---|---|
 | [`month-end-review`](plugins/month-end-review) | v0.1.0 | Checks a closed month is right, then writes variance commentary and an investor-update draft |
+| [`bank-reconciliation`](plugins/bank-reconciliation) | v0.1.0 | Explains why QuickBooks and the bank statement don't match, bridges each account to the cent, and drafts the fixes |
 | `stripe-to-books` | next | Stripe payouts, fees, refunds and disputes matched to the bank and the books |
 | `cash-13-week` | next | 13-week cash forecast with a runway line |
 
@@ -23,10 +24,15 @@ These skills share three rules:
 /plugin install month-end-review --marketplace nocodetalks/finance-skills
 ```
 
-On older Claude Code versions, use two steps: `/plugin marketplace add nocodetalks/finance-skills`, then
-`/plugin install month-end-review@finance-skills`.
+```
+/plugin install bank-reconciliation --marketplace nocodetalks/finance-skills
+```
 
-Then ask: *"Review September's close."* The skill starts on its own from requests like that. To start it by
+On older Claude Code versions, use two steps: `/plugin marketplace add nocodetalks/finance-skills`, then
+`/plugin install month-end-review@finance-skills` (or `bank-reconciliation@finance-skills`).
+
+Then ask: *"Review September's close."* or *"Why doesn't QuickBooks match the bank for September?"* The skills start
+on their own from requests like that. To start it by
 command, type `/month-end-review:month-end-review` (Claude Code's form for a plugin skill). The plain
 `/month-end-review` works too, unless another command already uses that name.
 
@@ -44,7 +50,9 @@ command, type `/month-end-review:month-end-review` (Claude Code's form for a plu
 - **Your data stays local.** Data is pulled by scripts straight to files on your machine, not pasted through
   the chat. Credentials files must be private (mode 600). Keep the `month-end/` work folder out of git.
 - **Your keys stay out of the chat.**
-  - You connect QuickBooks with your own Intuit app.
+  - month-end-review connects QuickBooks with your own Intuit app. bank-reconciliation reads the books through
+    whichever QuickBooks connector you already use, and checks the copied lines add up to QuickBooks' own balances.
+  - Even when a connector can write, the skills never post. A person approves each draft fix.
   - Its keys go in a `.env` file that only the scripts read.
   - There is no hosted nocodetalks service in between.
 - **No personal data in the outputs.**
@@ -58,7 +66,8 @@ command, type `/month-end-review:month-end-review` (Claude Code's form for a plu
 python3 -m unittest discover -s tests -v
 ```
 
-There are 227 tests on a small synthetic company ("Northwind", September 2026). They cover:
+There are 247 tests on a small synthetic company ("Northwind", September 2026): 227 for month-end-review and 20 for
+bank-reconciliation ([its tests](plugins/bank-reconciliation/README.md#tests)). The month-end-review ones cover:
 - **The 15 planted mistakes:** 14 caught, plus the one we expect to miss (a personal dinner on the company card
   needs a person's judgment).
 - **Realistic scenarios:**
